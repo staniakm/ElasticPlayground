@@ -7,9 +7,9 @@
   },
   "pivot": {
     "group_by": {
-      "car": {
+      "car.carName": {
         "terms": {
-          "field": "car.keyword"
+          "field": "car.carName.keyword"
         }
       },
       "date": {

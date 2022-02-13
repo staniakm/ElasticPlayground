@@ -12,6 +12,7 @@ import org.elasticsearch.client.RestClient
 import org.elasticsearch.client.RestHighLevelClient
 import org.elasticsearch.index.query.QueryBuilders
 import org.elasticsearch.search.builder.SearchSourceBuilder
+import org.elasticsearch.xcontent.XContentType
 import org.springframework.boot.CommandLineRunner
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
@@ -59,20 +60,20 @@ fun main(args: Array<String>) {
 class ElasticLoader(private val client: RestHighLevelClient, private val objectMapper: ObjectMapper) {
     fun loadRandomData() {
 
-        (0..500)
+        (0..2000)
             .map {
-                val document = IndexRequest("car-trip")
-                    .id(UUID.randomUUID().toString())
-                    .source(
-                        mapOf(
-                            "car" to cars.random().carName,
-                            "date" to dateRange.random(),
-                            "range" to Random.nextDouble(100.0),
-                            "creation_date" to LocalDateTime.now()
+                ElastiCarRequest(
+                    cars.random(),
+                    dateRange.random(),
+                    Random.nextDouble(100.0),
+                    LocalDateTime.now()
+                ).let { request ->
+                    IndexRequest("car-trip")
+                        .id(UUID.randomUUID().toString())
+                        .source(
+                            objectMapper.writeValueAsString(request), XContentType.JSON
                         )
-                    )
-
-                document
+                }
             }.windowed(500, 500)
             .map { requestList ->
                 println("bulk size = ${requestList.size}")
@@ -92,7 +93,7 @@ class ElasticLoader(private val client: RestHighLevelClient, private val objectM
 
     fun getCarSummaryPerCarName(carName: String): List<CarDistanceSummary> {
         val response: SearchResponse = SearchSourceBuilder()
-            .query(QueryBuilders.termQuery("car", carName))
+            .query(QueryBuilders.termQuery("car.carName", carName))
             .let { query ->
                 SearchRequest("car-summary")
                     .source(query)
@@ -110,6 +111,9 @@ class ElasticLoader(private val client: RestHighLevelClient, private val objectM
 @RestController
 @RequestMapping("/elastic")
 class FetchDataController(private val elasticLoader: ElasticLoader) {
+
+    @GetMapping("/sampleData")
+    fun createSampleData() = elasticLoader.loadRandomData()
 
     @GetMapping("")
     fun getData(@RequestParam carName: String) = elasticLoader.getCarSummaryPerCarName(carName)

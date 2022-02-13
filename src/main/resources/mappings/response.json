@@ -1,6 +1,8 @@
 {
   "date": "2022-01-02T00:00:00.000Z",
-  "car": "USA car 1",
+  "car": {
+    "carName": "USA car 1"
+  },
   "range": {
     "sum": 40.278794288635254,
     "per": {
