@@ -1,0 +1,82 @@
+{
+  "mappings": {
+    "properties": {
+      "car": {
+        "type": "text",
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+            "ignore_above": 256
+          }
+        }
+      },
+      "creation_date": {
+        "type": "date"
+      },
+      "date": {
+        "type": "date"
+      },
+      "ingest_timestamp": {
+        "type": "date"
+      },
+      "range": {
+        "type": "float"
+      }
+    }
+  },PUT _transform/car-summary
+{
+  "source": {
+    "index": [
+      "car-trip"
+    ]
+  },
+  "pivot": {
+    "group_by": {
+      "car": {
+        "terms": {
+          "field": "car.keyword"
+        }
+      },
+      "date": {
+        "date_histogram": {
+          "field": "date",
+          "calendar_interval": "1m"
+        }
+      }
+    },
+    "aggregations": {
+      "range.per.day": {
+        "avg": {
+          "field": "range"
+        }
+      },
+      "range.sum": {
+        "sum": {
+          "field": "range"
+        }
+      },
+      "range.value_count": {
+        "value_count": {
+          "field": "range"
+        }
+      }
+    }
+  },
+  "description": "car summary trip",
+  "frequency": "60s",
+  "dest": {
+    "index": "car-summary"
+  },
+  "sync": {
+    "time": {
+      "field": "ingest_timestamp",
+      "delay": "60s"
+    }
+  },
+  "settings": {
+    "max_page_search_size": 500
+  }
+}
+
+
+}

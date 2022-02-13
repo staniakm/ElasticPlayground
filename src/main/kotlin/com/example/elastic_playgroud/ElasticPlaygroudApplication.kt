@@ -8,7 +8,6 @@ import org.elasticsearch.action.support.WriteRequest
 import org.elasticsearch.client.RequestOptions
 import org.elasticsearch.client.RestClient
 import org.elasticsearch.client.RestHighLevelClient
-import org.elasticsearch.client.security.RefreshPolicy
 import org.springframework.boot.CommandLineRunner
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
@@ -16,6 +15,8 @@ import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Service
 import java.time.LocalDate
+import java.time.LocalDateTime
+import java.util.*
 import kotlin.random.Random
 import kotlin.streams.toList
 import kotlin.system.measureTimeMillis
@@ -24,6 +25,8 @@ import kotlin.system.measureTimeMillis
 val cars: List<Car> = listOf(
     Car("USA car 1", "Ford", "Mondeo"),
     Car("USA car 2", "Ford", "Kuga"),
+    Car("USA car 3", "Ford", "Avenger"),
+    Car("USA car 4", "Ford", "F150"),
     Car("Europe car 1", "Honda", "Civic"),
     Car("Europe car 2", "Honda", "HRV"),
     Car("Japan car 1", "Toyota", "Avensis"),
@@ -48,20 +51,21 @@ fun main(args: Array<String>) {
 class ElasticLoader(private val client: RestHighLevelClient, private val objectMapper: ObjectMapper) {
     fun loadRandomData() {
 
-        (0..2000).map {
-
-            val document = IndexRequest("car-trip")
-                .id(it.toString())
-                .source(
-                    mapOf(
-                        "car" to cars.random().carName,
-                        "date" to dateRange.random(),
-                        "range" to Random.nextDouble(100.0)
+        (0..500)
+            .map {
+                val document = IndexRequest("car-trip")
+                    .id(UUID.randomUUID().toString())
+                    .source(
+                        mapOf(
+                            "car" to cars.random().carName,
+                            "date" to dateRange.random(),
+                            "range" to Random.nextDouble(100.0),
+                            "creation_date" to LocalDateTime.now()
+                        )
                     )
-                )
 
-            document
-        }.windowed(500, 500)
+                document
+            }.windowed(500, 500)
             .map { requestList ->
                 println("bulk size = ${requestList.size}")
                 val bulkrequest = BulkRequest("car-trip")
@@ -71,9 +75,7 @@ class ElasticLoader(private val client: RestHighLevelClient, private val objectM
                 }
                 bulkrequest.refreshPolicy = WriteRequest.RefreshPolicy.WAIT_UNTIL
                 measureTimeMillis {
-                    client.bulk(bulkrequest, RequestOptions.DEFAULT).let {
-                        println(it.status())
-                    }
+                    println(client.bulk(bulkrequest, RequestOptions.DEFAULT).status())
                 }.let {
                     println("execution time: $it")
                 }

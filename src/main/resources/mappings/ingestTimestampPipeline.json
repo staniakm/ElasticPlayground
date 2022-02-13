@@ -1,0 +1,13 @@
+//PUT _ingest/pipeline/my_timestamp_pipeline
+
+{
+  "description": "Adds a field to a document with the time of ingestion",
+  "processors": [
+    {
+      "set": {
+        "field": "ingest_timestamp",
+        "value": "{{_ingest.timestamp}}"
+      }
+    }
+  ]
+}

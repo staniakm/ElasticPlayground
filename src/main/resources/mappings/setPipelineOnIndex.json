@@ -1,0 +1,6 @@
+//PUT car-trip
+{
+  "settings": {
+    "default_pipeline": "my_timestamp_pipeline"
+  }
+}
