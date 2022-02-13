@@ -20,7 +20,7 @@
       }
     },
     "aggregations": {
-      "range.per.day": {
+      "range.average": {
         "avg": {
           "field": "range"
         }

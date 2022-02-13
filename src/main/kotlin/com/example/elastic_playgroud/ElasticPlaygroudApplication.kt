@@ -4,16 +4,24 @@ import com.fasterxml.jackson.databind.ObjectMapper
 import org.apache.http.HttpHost
 import org.elasticsearch.action.bulk.BulkRequest
 import org.elasticsearch.action.index.IndexRequest
+import org.elasticsearch.action.search.SearchRequest
+import org.elasticsearch.action.search.SearchResponse
 import org.elasticsearch.action.support.WriteRequest
 import org.elasticsearch.client.RequestOptions
 import org.elasticsearch.client.RestClient
 import org.elasticsearch.client.RestHighLevelClient
+import org.elasticsearch.index.query.QueryBuilders
+import org.elasticsearch.search.builder.SearchSourceBuilder
 import org.springframework.boot.CommandLineRunner
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
 import org.springframework.stereotype.Service
+import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.RequestParam
+import org.springframework.web.bind.annotation.RestController
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.util.*
@@ -39,7 +47,7 @@ val dateRange: List<LocalDate> =
 @SpringBootApplication
 class ElasticPlaygroudApplication(private val elasticLoader: ElasticLoader) : CommandLineRunner {
     override fun run(vararg args: String?) {
-        elasticLoader.loadRandomData()
+//        elasticLoader.loadRandomData()
     }
 }
 
@@ -81,6 +89,30 @@ class ElasticLoader(private val client: RestHighLevelClient, private val objectM
                 }
             }
     }
+
+    fun getCarSummaryPerCarName(carName: String): List<CarDistanceSummary> {
+        val response: SearchResponse = SearchSourceBuilder()
+            .query(QueryBuilders.termQuery("car", carName))
+            .let { query ->
+                SearchRequest("car-summary")
+                    .source(query)
+            }.let {
+                client.search(it, RequestOptions.DEFAULT)
+            }
+
+        return response.hits.map {
+            objectMapper.readValue(it.sourceAsString, CarDistanceSummary::class.java)
+        }
+
+    }
+}
+
+@RestController
+@RequestMapping("/elastic")
+class FetchDataController(private val elasticLoader: ElasticLoader) {
+
+    @GetMapping("")
+    fun getData(@RequestParam carName: String) = elasticLoader.getCarSummaryPerCarName(carName)
 }
 
 @Configuration
