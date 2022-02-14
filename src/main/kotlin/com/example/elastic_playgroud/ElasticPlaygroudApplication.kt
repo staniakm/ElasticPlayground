@@ -1,12 +1,19 @@
 package com.example.elastic_playgroud
 
 import com.fasterxml.jackson.databind.ObjectMapper
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.runBlocking
 import org.apache.http.HttpHost
+import org.elasticsearch.action.ActionListener
 import org.elasticsearch.action.bulk.BulkRequest
+import org.elasticsearch.action.bulk.BulkResponse
 import org.elasticsearch.action.index.IndexRequest
 import org.elasticsearch.action.search.SearchRequest
 import org.elasticsearch.action.search.SearchResponse
 import org.elasticsearch.action.support.WriteRequest
+import org.elasticsearch.client.Cancellable
 import org.elasticsearch.client.RequestOptions
 import org.elasticsearch.client.RestClient
 import org.elasticsearch.client.RestHighLevelClient
@@ -48,7 +55,13 @@ val dateRange: List<LocalDate> =
 @SpringBootApplication
 class ElasticPlaygroudApplication(private val elasticLoader: ElasticLoader) : CommandLineRunner {
     override fun run(vararg args: String?) {
-//        elasticLoader.loadRandomData()
+        (1..4).map {
+            measureTimeMillis {
+                elasticLoader.loadRandomData()
+            }.let {
+                println("time: $it")
+            }
+        }
     }
 }
 
@@ -58,9 +71,9 @@ fun main(args: Array<String>) {
 
 @Service
 class ElasticLoader(private val client: RestHighLevelClient, private val objectMapper: ObjectMapper) {
-    fun loadRandomData() {
+    fun loadRandomData() = runBlocking {
 
-        (0..2000)
+        val map = (0..2000)
             .map {
                 ElastiCarRequest(
                     cars.random(),
@@ -74,21 +87,28 @@ class ElasticLoader(private val client: RestHighLevelClient, private val objectM
                             objectMapper.writeValueAsString(request), XContentType.JSON
                         )
                 }
-            }.windowed(500, 500)
-            .map { requestList ->
-                println("bulk size = ${requestList.size}")
-                val bulkrequest = BulkRequest("car-trip")
+            }
 
-                requestList.forEach {
-                    bulkrequest.add(it)
-                }
-                bulkrequest.refreshPolicy = WriteRequest.RefreshPolicy.WAIT_UNTIL
-                measureTimeMillis {
-                    println(client.bulk(bulkrequest, RequestOptions.DEFAULT).status())
-                }.let {
-                    println("execution time: $it")
+        val map1 = map
+            .windowed(500, 500)
+            .map { requestList ->
+                async {
+                    println("bulk size = ${requestList.size}")
+                    val bulkrequest = BulkRequest("car-trip")
+
+                    requestList.forEach {
+                        bulkrequest.add(it)
+                    }
+                    bulkrequest.refreshPolicy = WriteRequest.RefreshPolicy.WAIT_UNTIL
+                    doSomeCalculations(bulkrequest)
                 }
             }
+        println(map1.awaitAll().map { it?.status() })
+    }
+
+    private suspend fun doSomeCalculations(bulkrequest: BulkRequest): BulkResponse? {
+        delay(1)
+        return client.bulk(bulkrequest, RequestOptions.DEFAULT)
     }
 
     fun getCarSummaryPerCarName(carName: String): List<CarDistanceSummary> {
@@ -106,6 +126,17 @@ class ElasticLoader(private val client: RestHighLevelClient, private val objectM
         }
 
     }
+}
+
+class Listener : ActionListener<BulkResponse> {
+    override fun onResponse(p0: BulkResponse?) {
+        println("Response")
+    }
+
+    override fun onFailure(p0: Exception?) {
+        println("Exception")
+    }
+
 }
 
 @RestController
